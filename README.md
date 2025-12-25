@@ -1,4 +1,4 @@
-# Plugin/Skill to search for toher Claude Plugin/Skills
+# SkillIssue: Plugin/Skill to search for other Claude Plugin/Skills
 
 A Claude Code skill for discovering and recommending plugins and skills from multiple marketplaces with analysis and installation instructions.
 
