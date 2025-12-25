@@ -1,0 +1,13 @@
+{
+    "name": "1xn-plugins",
+    "owner": {
+        "name": "AmitB",
+        "url": "https://1xn.ai"
+    },
+    "plugins": [
+        {
+            "name": "Skill-issue",
+            "source": "./../"
+        }
+    ]
+}
