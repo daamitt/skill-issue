@@ -1,0 +1,6 @@
+# Data directory (auto-downloaded)
+data/
+
+# Python cache
+__pycache__/
+*.py[cod]
