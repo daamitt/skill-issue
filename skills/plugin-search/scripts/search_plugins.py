@@ -15,8 +15,8 @@ from typing import List, Dict, Any, Optional, Tuple
 
 
 CACHE_DURATION = 60 * 60  # 60 minutes in seconds
-DATA_DIR = "./data"
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(SCRIPT_DIR, "data")
 MARKETPLACES_CONFIG = os.path.join(SCRIPT_DIR, "marketplaces.json")
 MARKETPLACE_PATH_SUFFIX = "/main/.claude-plugin/marketplace.json"
 
@@ -576,7 +576,7 @@ Examples:
 
         if len(results) == 0:
             print("\nNo plugins found matching your criteria.")
-            print("Try using --list-categories to see available options.")
+            print("Try broadening your search or checking available categories.")
         else:
             for plugin in results:
                 print(format_plugin_output(plugin, detailed=args.detailed))

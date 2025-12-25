@@ -1,28 +1,23 @@
 ---
-name: skill-plugin-search
-description: Search for claude plugins for a specific skill to help user with a task
+name: plugin-search
+description: Search for claude plugins or skill to help user with a task
 ---
 
 # Skill and Plugin Search
 
 ## Instructions
-Use the `scripts/search_plugins.py` script to find relevant Claude Code plugins that match the user's requirements.
+Use the `<SKILL_BASE_DIR>/scripts/search_plugins.py` script to find relevant Claude Code plugins that match the user's requirements.
 
-1. **Start with overview** - List plugins by category or search term:
+1. **Start with overview** - List all the plugins:
    ```bash
-   python3 scripts/search_plugins.py -q "<user's requirements>"
-   python3 scripts/search_plugins.py -c productivity
+   python <SKILL_BASE_DIR>/scripts/search_plugins.py --json 
    ```
+2. Choose upto 3 matches based in the latest task in context and the users query if provided
 
-2. **Get detailed information** - Use `-d` flag for comprehensive analysis:
+3. **Get detailed information** - Use `-d` flag for comprehensive information of a plugin:
    ```bash
-   python3 scripts/search_plugins.py -q "<plugin name>" -d
+   python <SKILL_BASE_DIR>/scripts/search_plugins.py -q "<plugin name>" -d
    ```
-
-3. The script automatically:
-   - Downloads the latest marketplace data (if needed)
-   - Searches across plugin names and descriptions
-   - Returns matching results
 
 4. **Detailed mode (`-d`) provides:**
    - ⭐ **GitHub stars** - Repository popularity
@@ -37,55 +32,17 @@ Use the `scripts/search_plugins.py` script to find relevant Claude Code plugins 
      ```
 
 5. **For each suggested plugin, provide:**
-   - Plugin name
-   - Brief description
-   - Category
+   - Plugin name and description
+   - Plugin stats: Stars, MCP, Commands, Skills, Last Updated
+   - A brief justification of the match and fit to the usecase
    - **Installation commands** (from detailed output)
-   - GitHub stats (stars, last updated)
    - Homepage link
 
-## Examples
+## Skill/Plugin recommendation output for Plugin 'Acme'
 
-### Search for database plugins
-```bash
-python3 scripts/search_plugins.py -q "database"
 ```
+1. Acme : "MCP and Skills for ACME corp"
 
-### Search for issue tracking tools
-```bash
-python3 scripts/search_plugins.py -q "issue tracking"
-```
-
-### List all productivity plugins
-```bash
-python3 scripts/search_plugins.py -c productivity
-```
-
-### Get detailed information with stats and installation
-```bash
-python3 scripts/search_plugins.py -q "notion" -d
-```
-This shows:
-- GitHub stars and last updated date
-- MCP support, commands, and skills
-- **Ready-to-use installation commands**
-
-### See available categories
-```bash
-python3 scripts/search_plugins.py --list-categories
-```
-
-## Tips
-- **Start with overview**: List all plugins first (by category or search), then use `-d` for detailed analysis
-- **Always use `-d` when recommending plugins** to provide installation instructions and stats
-- Use broad search terms first, then narrow down
-- Check multiple categories if the query is ambiguous
-- Combine search terms for better results (e.g., "notion database")
-
-## Example Skill/Plugin recommendation output
- 1. Notion
-
-  Category: productivity
   ⭐ Stars: 6 | 🔌 MCP: 1 | 📜 Commands: 6 | 🎯 Skills: 4 | 🕐 Last Updated: 2025-12-22
 
   Great for managing meeting documentation with:
@@ -95,9 +52,54 @@ python3 scripts/search_plugins.py --list-categories
 
   Installation:
   /plugin marketplace add anthropics/claude-plugins-official
-  /plugin install Notion@claude-plugins-official
+  /plugin install Acme@claude-plugins-official
 
-  Homepage: https://github.com/makenotion/claude-code-notion-plugin
+  Homepage: https://github.com/acme/claude-acme-plugin
+  
+------------
+```
 
-  ---
+## Examples
+
+### Search for database plugins
+```bash
+python <SKILL_BASE_DIR>/scripts/search_plugins.py -q "database"
+```
+
+### Search for issue tracking tools
+```bash
+python <SKILL_BASE_DIR>/scripts/search_plugins.py -q "issue tracking"
+```
+
+### List all productivity plugins
+```bash
+python <SKILL_BASE_DIR>/scripts/search_plugins.py -c productivity
+```
+
+### Get detailed information with stats and installation
+```bash
+python <SKILL_BASE_DIR>/scripts/search_plugins.py -q "notion" -d
+```
+This shows:
+- GitHub stars and last updated date
+- MCP support, commands, and skills
+- **Ready-to-use installation commands**
+
+### See available categories
+```bash
+python <SKILL_BASE_DIR>/scripts/search_plugins.py --list-categories
+```
+
+### Get help
+```bash
+python <SKILL_BASE_DIR>/scripts/search_plugins.py --help
+```
+
+## Tips
+- **Start with overview**: List all plugins first (by category or search), then use `-d` for detailed analysis
+- **Always use `-d` when recommending plugins** to provide installation instructions and stats
+- Use broad search terms first, then narrow down
+- Check multiple categories if the query is ambiguous
+- Combine search terms for better results (e.g., "notion database")
+
    

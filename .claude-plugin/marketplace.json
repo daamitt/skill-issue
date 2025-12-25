@@ -10,7 +10,7 @@
     },
     "plugins": [
         {
-            "name": "Skill-issue",
+            "name": "SkillIssue",
             "source": "./"
         }
     ]
