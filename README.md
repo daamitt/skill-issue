@@ -1,10 +1,10 @@
-# Claude Plugin Search Skill
+# Plugin/Skill to search for toher Claude Plugin/Skills
 
-A Claude Code skill for discovering and recommending plugins from multiple marketplaces with comprehensive analysis and installation instructions.
+A Claude Code skill for discovering and recommending plugins and skills from multiple marketplaces with analysis and installation instructions.
 
 ## Overview
 
-This skill helps users find the right Claude Code plugins for their needs by searching across multiple marketplaces, analyzing plugin capabilities, and providing ready-to-use installation commands.
+This skill helps users find the right Claude Code plugins for their needs based on the current context or a user driven query by searching across multiple marketplaces, analyzing plugin capabilities, and providing ready-to-use installation commands.
 
 ## Features
 
@@ -14,40 +14,10 @@ This skill helps users find the right Claude Code plugins for their needs by sea
 - 📥 **Installation Ready** - Provides copy-paste installation commands
 - 🔄 **Auto-Update** - Fresh marketplace data every 60 minutes
 
-## What the Skill Provides
-
-When you ask Claude to search for plugins (e.g., "find plugins for issue tracking"), the skill returns:
-
-### Basic Information
-- Plugin name and description
-- Category
-- Homepage link
-
-### Detailed Analysis 
-- ⭐ GitHub stars (popularity)
-- 🕐 Last updated date (maintenance status)
-- 🔌 MCP support (Model Context Protocol integration)
-- 📜 Commands (count and names)
-- 🎯 Skills (count and paths)
-- 📥 Installation instructions
-
 ## Installation
 ```bash
 claude plugin marketplace add daamitt/skill-issue
 claude plugin i Skill-issue
-```
-
-
-
-### Requirements
-- Python 3.6+
-- `curl` (for downloading marketplace data)
-
-### Usage
-The skill is invoked automatically when you ask Claude to search for plugins, or you can use the `/search` command:
-
-```
-/search notion and issue tracking
 ```
 
 ## Example Output
@@ -68,9 +38,41 @@ The skill is invoked automatically when you ask Claude to search for plugins, or
    Homepage: https://github.com/makenotion/claude-code-notion-plugin
 ```
 
+## What the Skill Provides
+
+When you ask Claude to search for plugins (e.g., "find plugins for issue tracking"), the skill returns:
+
+### Basic Information
+- Plugin name and description
+- Category
+- Homepage link
+
+### Detailed Analysis 
+- ⭐ GitHub stars (popularity)
+- 🕐 Last updated date (maintenance status)
+- 🔌 MCP support (Model Context Protocol integration)
+- 📜 Commands (count and names)
+- 🎯 Skills (count and paths)
+- 📥 Installation instructions
+
+
+### Requirements
+- Python 3.6+
+- `curl` (for downloading marketplace data)
+
+### Usage
+The skill is invoked automatically when you ask Claude to search for plugins, or you can use the `/search` command:
+
+```
+/search notion and issue tracking
+```
+
+
 ## Marketplaces Supported
 
 The skill searches across multiple marketplaces configured in `skills/plugin-search/scripts/marketplaces.json`:
+eg:
+`~/.claude/plugins/cache/1xn-plugins/SkillIssue/0.1.0/skills/plugin-search/scripts/marketplaces.json`
 
 - **claude-plugins-official** - Official Anthropic plugins
 - **anthropics-skills** - Skills marketplace
