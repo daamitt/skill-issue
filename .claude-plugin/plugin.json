@@ -1,6 +1,6 @@
 {
-    "name": "Skill-Issue",
-    "description": "Search for Claude Plugins and Skills",
+    "name": "Skill-issue",
+    "description": "Skill to search for Claude Plugins and Skills",
     "version": "0.1.0",
     "author": {
         "name": "AmitB",

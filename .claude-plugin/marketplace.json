@@ -1,5 +1,9 @@
 {
     "name": "1xn-plugins",
+    "metadata": {
+        "description": "A marketplace for Claude Plugins developed by 1xn.ai"
+    },
+    "description": "A marketplace for Claude Plugins developed by 1xn.ai",
     "owner": {
         "name": "AmitB",
         "url": "https://1xn.ai"
@@ -7,7 +11,7 @@
     "plugins": [
         {
             "name": "Skill-issue",
-            "source": "./../"
+            "source": "./"
         }
     ]
 }

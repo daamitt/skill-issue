@@ -23,7 +23,7 @@ When you ask Claude to search for plugins (e.g., "find plugins for issue trackin
 - Category
 - Homepage link
 
-### Detailed Analysis (with `-d` flag)
+### Detailed Analysis 
 - ⭐ GitHub stars (popularity)
 - 🕐 Last updated date (maintenance status)
 - 🔌 MCP support (Model Context Protocol integration)
@@ -32,8 +32,12 @@ When you ask Claude to search for plugins (e.g., "find plugins for issue trackin
 - 📥 Installation instructions
 
 ## Installation
+```bash
+claude plugin marketplace add daamitt/skill-issue
+claude plugin i Skill-issue
+```
 
-The skill is located at `skills/plugin-search/` and uses a Python search script.
+
 
 ### Requirements
 - Python 3.6+
