@@ -20,6 +20,17 @@ claude plugin marketplace add daamitt/skill-issue
 claude plugin i Skill-issue
 ```
 
+## Usage
+
+1. In claude at any point you can ask to search for a skill based on the task in context
+```
+Can you search for a plugin to help with this?"
+```
+2. You can use the /search command
+```
+/SkillIssue:search linear and github
+```
+
 ## Example Output
 
 ```
