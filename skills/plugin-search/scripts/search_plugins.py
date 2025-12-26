@@ -82,8 +82,6 @@ def download_marketplace(github_url: str, file_path: str) -> bool:
         if dir_path:
             os.makedirs(dir_path, exist_ok=True)
 
-        print(f"Downloading {owner}/{repo} marketplace data...", file=sys.stderr)
-
         # Use GitHub API with proper headers
         result = subprocess.run(
             ['curl', '-sL', '-H', 'Accept: application/vnd.github.v3+json', api_url],
@@ -118,7 +116,6 @@ def download_marketplace(github_url: str, file_path: str) -> bool:
             with open(file_path, 'w') as f:
                 f.write(content)
 
-            print(f"Successfully downloaded to {file_path}", file=sys.stderr)
             return True
 
         except (json.JSONDecodeError, KeyError) as e:
@@ -157,18 +154,20 @@ def ensure_all_marketplaces() -> Dict[str, Any]:
                     continue
                 else:
                     print(f"Warning: Using cached {name} data due to download failure.", file=sys.stderr)
-        else:
-            age_minutes = (time.time() - os.path.getmtime(file_path)) / 60
-            print(f"Using cached {name} marketplace (age: {age_minutes:.1f} minutes)", file=sys.stderr)
 
         # Load and merge plugins
         try:
             with open(file_path, 'r') as f:
                 data = json.load(f)
                 plugins = data.get('plugins', [])
-                # Add marketplace name to each plugin
+                # Get owner from marketplace data
+                owner_data = data.get('owner', {})
+                owner_name = owner_data.get('name', 'Unknown') if isinstance(owner_data, dict) else 'Unknown'
+
+                # Add marketplace name and owner to each plugin
                 for plugin in plugins:
                     plugin['_marketplace'] = name
+                    plugin['_owner'] = owner_name
                 all_plugins.extend(plugins)
         except (FileNotFoundError, json.JSONDecodeError) as e:
             print(f"Warning: Could not load {name} marketplace: {e}", file=sys.stderr)
@@ -188,21 +187,30 @@ def search_plugins(
     plugins: List[Dict[str, Any]],
     query: str = None,
     category: str = None,
-    tags: List[str] = None
+    tags: List[str] = None,
+    marketplace: str = None
 ) -> List[Dict[str, Any]]:
     """
-    Search plugins based on query, category, and tags.
+    Search plugins based on query, category, tags, and marketplace.
 
     Args:
         plugins: List of plugin dictionaries
         query: Search term to match against name and description
         category: Filter by category
         tags: Filter by tags
+        marketplace: Filter by marketplace name
 
     Returns:
         Filtered list of plugins
     """
     results = plugins
+
+    # Filter by marketplace
+    if marketplace:
+        results = [
+            p for p in results
+            if p.get('_marketplace', '').lower() == marketplace.lower()
+        ]
 
     # Filter by category
     if category:
@@ -218,14 +226,29 @@ def search_plugins(
             if any(tag.lower() in [t.lower() for t in p.get('tags', [])] for tag in tags)
         ]
 
-    # Filter by query (search in name and description)
+    # Filter by query (search in name, description, tags, category, keywords)
+    # Supports multiple terms with OR logic (any term matches)
     if query:
-        query_lower = query.lower()
-        results = [
-            p for p in results
-            if query_lower in p.get('name', '').lower() or
-               query_lower in p.get('description', '').lower()
-        ]
+        # Split query into individual terms
+        query_terms = query.lower().split()
+
+        filtered_results = []
+        for plugin in results:
+            # Build searchable text from multiple fields
+            searchable_fields = [
+                plugin.get('name', ''),
+                plugin.get('description', ''),
+                plugin.get('category', ''),
+                ' '.join(plugin.get('tags', [])),
+                ' '.join(plugin.get('keywords', []))
+            ]
+            searchable_text = ' '.join(searchable_fields).lower()
+
+            # Check if ANY query term matches (OR logic)
+            if any(term in searchable_text for term in query_terms):
+                filtered_results.append(plugin)
+
+        results = filtered_results
 
     return results
 
@@ -366,6 +389,16 @@ def fetch_github_repo_info(owner: str, repo: str, branch: str = 'main', plugin_p
         return None
 
 
+def format_plugin_compact(plugin: Dict[str, Any]) -> str:
+    """Format a plugin in compact mode (optimized for token usage)."""
+    name = plugin.get('name', 'Unknown')
+    category = plugin.get('category', 'uncategorized')
+    description = plugin.get('description', 'No description')
+    owner = plugin.get('_owner', 'Unknown')
+
+    return f"{name} ({category}) [{owner}] - {description}"
+
+
 def format_plugin_output(plugin: Dict[str, Any], detailed: bool = False) -> str:
     """Format a plugin for display."""
     name = plugin.get('name', 'Unknown')
@@ -373,9 +406,10 @@ def format_plugin_output(plugin: Dict[str, Any], detailed: bool = False) -> str:
     category = plugin.get('category', 'uncategorized')
     homepage = plugin.get('homepage', 'N/A')
     tags = plugin.get('tags', [])
+    owner = plugin.get('_owner', 'Unknown')
 
     output = f"\n{'='*80}\n"
-    output += f"📦 {name}\n"
+    output += f"📦 {name} [{owner}]\n"
     output += f"{'='*80}\n"
     output += f"Category: {category}\n"
     output += f"Description: {description}\n"
@@ -384,20 +418,8 @@ def format_plugin_output(plugin: Dict[str, Any], detailed: bool = False) -> str:
         output += f"Tags: {', '.join(tags)}\n"
 
     if detailed:
-        author = plugin.get('author', {})
-        if author:
-            author_name = author.get('name', 'Unknown')
-            author_email = author.get('email', 'N/A')
-            output += f"Author: {author_name} ({author_email})\n"
-
-        version = plugin.get('version')
-        if version:
-            output += f"Version: {version}\n"
-
-        source = plugin.get('source', 'N/A')
-        output += f"Source: {source}\n"
-
         # Determine the URL to use for GitHub API and extract plugin path
+        source = plugin.get('source', 'N/A')
         github_url = homepage
         plugin_path = None
 
@@ -411,7 +433,6 @@ def format_plugin_output(plugin: Dict[str, Any], detailed: bool = False) -> str:
             # Get the GitHub URL from marketplace config
             if marketplace_info:
                 # Extract owner/repo from base_url
-                # e.g., https://raw.githubusercontent.com/anthropics/skills -> anthropics/skills
                 base_url = marketplace_info['base_url']
                 match = re.search(r'github(?:usercontent)?\.com/([^/]+)/([^/]+)', base_url)
                 if match:
@@ -428,56 +449,58 @@ def format_plugin_output(plugin: Dict[str, Any], detailed: bool = False) -> str:
         github_info = parse_github_url(github_url)
         if github_info:
             owner, repo, branch = github_info
-            output += f"\nGitHub Repository: {owner}/{repo}\n"
-
             repo_data = fetch_github_repo_info(owner, repo, branch, plugin_path)
-            if repo_data:
-                # Show stars and last updated
-                output += f"  ⭐ Stars: {repo_data['stars']}\n"
 
+            if repo_data:
+                # Build stats line
+                stats_parts = []
+
+                # Stars
+                stats_parts.append(f"⭐ Stars: {repo_data['stars']}")
+
+                # MCP support
+                mcp_status = "Yes" if repo_data.get('has_mcp') else "No"
+                stats_parts.append(f"🔌 MCP: {mcp_status}")
+
+                # Commands count
+                commands = repo_data.get('commands', [])
+                stats_parts.append(f"📜 Commands: {len(commands)}")
+
+                # Skills count
+                skills = repo_data.get('skills', [])
+                stats_parts.append(f"🎯 Skills: {len(skills)}")
+
+                # Last updated
                 if repo_data['updated_at']:
-                    # Format date nicely
                     from datetime import datetime
                     try:
                         updated = datetime.fromisoformat(repo_data['updated_at'].replace('Z', '+00:00'))
-                        output += f"  🕐 Last Updated: {updated.strftime('%Y-%m-%d')}\n"
+                        stats_parts.append(f"🕐 Last Updated: {updated.strftime('%Y-%m-%d')}")
                     except:
                         pass
 
-                # Show plugin directory structure
-                if plugin_path is not None:
-                    if plugin_path:
-                        output += f"\nPlugin Directory: {plugin_path}\n"
-                    else:
-                        output += f"\nPlugin Structure:\n"
+                # Output stats line
+                output += f"\n{' | '.join(stats_parts)}\n"
 
-                    # MCP support
-                    if repo_data.get('has_mcp'):
-                        output += f"  🔌 MCP: Yes (.mcp.json found)\n"
-                    else:
-                        output += f"  🔌 MCP: No\n"
+                # Show detailed lists if there are commands or skills
+                if commands or skills:
+                    output += f"\n"
 
-                    # Commands
-                    commands = repo_data.get('commands', [])
                     if commands:
-                        output += f"  📜 Commands: {len(commands)}\n"
+                        output += f"Commands:\n"
                         for cmd in commands[:5]:  # Show first 5
-                            output += f"      - {cmd}\n"
+                            output += f"  - {cmd}\n"
                         if len(commands) > 5:
-                            output += f"      ... and {len(commands) - 5} more\n"
-                    else:
-                        output += f"  📜 Commands: None\n"
+                            output += f"  ... and {len(commands) - 5} more\n"
 
-                    # Skills
-                    skills = repo_data.get('skills', [])
                     if skills:
-                        output += f"  🎯 Skills: {len(skills)}\n"
+                        if commands:
+                            output += f"\n"
+                        output += f"Skills:\n"
                         for skill in skills[:5]:  # Show first 5
-                            output += f"      - {skill}\n"
+                            output += f"  - {skill}\n"
                         if len(skills) > 5:
-                            output += f"      ... and {len(skills) - 5} more\n"
-                    else:
-                        output += f"  🎯 Skills: None\n"
+                            output += f"  ... and {len(skills) - 5} more\n"
 
         # Add installation instructions in detailed mode
         marketplace_name = plugin.get('_marketplace', 'claude-plugins-official')
@@ -535,11 +558,13 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s -q notion              # Search for plugins matching "notion"
-  %(prog)s -c productivity        # List all productivity plugins
-  %(prog)s -q "issue tracking"    # Search for issue tracking plugins
-  %(prog)s --list-categories      # Show all available categories
-  %(prog)s -q api -d              # Detailed search results
+  %(prog)s -q notion                    # Search for plugins matching "notion"
+  %(prog)s --all                        # List all plugins (compact)
+  %(prog)s --list                       # Show marketplaces and categories
+  %(prog)s -d notion linear github      # Detailed info for specific plugins
+  %(prog)s -q "issue tracking" -d       # Search with detailed results
+  %(prog)s --all -m anthropics-skills   # List plugins from specific marketplace
+  %(prog)s -c productivity              # List all productivity plugins
         """
     )
 
@@ -561,26 +586,26 @@ Examples:
 
     parser.add_argument(
         '-d', '--detailed',
-        action='store_true',
-        help='Show detailed information'
+        nargs='*',
+        metavar='PLUGIN',
+        help='Show detailed information (optionally specify plugin names: -d notion linear)'
     )
 
     parser.add_argument(
-        '--list-categories',
+        '--list',
         action='store_true',
-        help='List all available categories'
+        help='List all marketplaces and categories'
     )
 
     parser.add_argument(
-        '--list-tags',
+        '--all',
         action='store_true',
-        help='List all available tags'
+        help='List all plugins (no search query required)'
     )
 
     parser.add_argument(
-        '--json',
-        action='store_true',
-        help='Output results as JSON'
+        '-m', '--marketplace',
+        help='Filter by marketplace (e.g., claude-plugins-official, anthropics-skills, claude-code-templates)'
     )
 
     args = parser.parse_args()
@@ -590,41 +615,87 @@ Examples:
     plugins = marketplace.get('plugins', [])
 
     # Handle list commands
-    if args.list_categories:
+    if args.list:
+        # List marketplaces
+        marketplaces = load_marketplaces_config()
+        print(f"\nMarketplaces ({len(marketplaces)}):")
+        for m in marketplaces:
+            name = m['name']
+            base_url = m['base_url']
+            count = len([p for p in plugins if p.get('_marketplace') == name])
+            print(f"  • {name} ({count} plugins)")
+            print(f"    {base_url}")
+
+        # List categories
         categories = list_categories(plugins)
-        print(f"\nAvailable categories ({len(categories)}):")
+        print(f"\nCategories ({len(categories)}):")
         for cat in categories:
             count = len([p for p in plugins if p.get('category') == cat])
             print(f"  • {cat} ({count} plugins)")
         return
 
-    if args.list_tags:
-        tags = list_tags(plugins)
-        print(f"\nAvailable tags ({len(tags)}):")
-        for tag in tags:
-            print(f"  • {tag}")
-        return
+    # Handle -d with specific plugin names
+    if args.detailed is not None and len(args.detailed) > 0:
+        # Specific plugin names provided with -d
+        plugin_names = [name.lower() for name in args.detailed]
+        results = [p for p in plugins if p.get('name', '').lower() in plugin_names]
 
-    # Search plugins
-    results = search_plugins(
-        plugins,
-        query=args.query,
-        category=args.category,
-        tags=args.tags
-    )
+        print(f"\nFound {len(results)} plugin(s)")
 
-    # Output results
-    if args.json:
-        print(json.dumps(results, indent=2))
+        if len(results) == 0:
+            print("\nNo plugins found with the specified names.")
+            print(f"Searched for: {', '.join(args.detailed)}")
+        else:
+            for plugin in results:
+                print(format_plugin_output(plugin, detailed=True))
+
+            # Show tip if more than 3 results
+            if len(results) > 3:
+                print("\n" + "="*80)
+                print("**TIP**: Use the AskUserQuestion tool to narrow down the users requirements")
+                print("="*80)
     else:
+        # Normal search flow
+        if args.all:
+            # When --all is used, don't filter by query (show all plugins)
+            results = search_plugins(
+                plugins,
+                query=None,
+                category=args.category,
+                tags=args.tags,
+                marketplace=args.marketplace
+            )
+        else:
+            # Search plugins with query
+            results = search_plugins(
+                plugins,
+                query=args.query,
+                category=args.category,
+                tags=args.tags,
+                marketplace=args.marketplace
+            )
+
+        # Output results
         print(f"\nFound {len(results)} plugin(s)")
 
         if len(results) == 0:
             print("\nNo plugins found matching your criteria.")
             print("Try broadening your search or checking available categories.")
         else:
-            for plugin in results:
-                print(format_plugin_output(plugin, detailed=args.detailed))
+            # Use detailed format when -d is specified (without args), otherwise use compact format
+            if args.detailed is not None:
+                for plugin in results:
+                    print(format_plugin_output(plugin, detailed=True))
+
+                # Show tip if more than 3 results
+                if len(results) > 3:
+                    print("\n" + "="*80)
+                    print("**TIP**: Use the AskUserQuestion tool to narrow down the users requirements")
+                    print("="*80)
+            else:
+                print()  # Empty line before list
+                for i, plugin in enumerate(results, 1):
+                    print(f"{i}. {format_plugin_compact(plugin)}")
 
 
 if __name__ == '__main__':
