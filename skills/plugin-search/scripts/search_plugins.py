@@ -102,8 +102,14 @@ def download_marketplace(github_url: str, file_path: str) -> bool:
             api_response = json.loads(result.stdout)
 
             if 'content' not in api_response:
-                print(f"Error: GitHub API response missing 'content' field", file=sys.stderr)
-                print(f"Response: {result.stdout[:200]}", file=sys.stderr)
+                # Check if this is a rate limit error
+                if 'message' in api_response and 'rate limit' in api_response['message'].lower():
+                    print(f"\n⚠️  GitHub API Rate Limit Exceeded", file=sys.stderr)
+                    print(f"   The search will use cached data where available.", file=sys.stderr)
+                    print(f"   To get fresh data, wait ~60 minutes or use authenticated GitHub requests.\n", file=sys.stderr)
+                else:
+                    print(f"Error: GitHub API response missing 'content' field", file=sys.stderr)
+                    print(f"Response: {result.stdout[:200]}", file=sys.stderr)
                 return False
 
             # Decode base64 content
@@ -335,6 +341,8 @@ def fetch_github_repo_info(owner: str, repo: str, branch: str = 'main', plugin_p
                     # Analyze plugin directory structure
                     commands = []
                     skills = []
+                    agents = []
+                    hooks = []
                     has_mcp = False
 
                     # Normalize plugin_path
@@ -374,8 +382,25 @@ def fetch_github_repo_info(owner: str, repo: str, branch: str = 'main', plugin_p
                                     if skill_path and skill_path not in skills:
                                         skills.append(skill_path)
 
+                            # Check for agents
+                            if relative_path.startswith('agents/'):
+                                remaining = relative_path[7:]
+                                # Only get direct .md files in agents/ directory
+                                if remaining and '/' not in remaining and remaining.endswith('.md'):
+                                    if item.get('type') == 'blob':
+                                        agents.append(remaining)
+
+                            # Check for hooks.json
+                            if relative_path == 'hooks/hooks.json' or (plugin_prefix and relative_path == 'hooks.json'):
+                                if item.get('type') == 'blob':
+                                    # Mark that we found hooks.json
+                                    # We'll use this as a flag to indicate hooks are present
+                                    hooks.append('hooks.json')
+
                     info['commands'] = sorted(commands)
                     info['skills'] = sorted(skills)
+                    info['agents'] = sorted(agents)
+                    info['hooks'] = sorted(hooks)
                     info['has_mcp'] = has_mcp
 
                 except (json.JSONDecodeError, KeyError):
@@ -445,62 +470,117 @@ def format_plugin_output(plugin: Dict[str, Any], detailed: bool = False) -> str:
             github_url = source.get('url')
             plugin_path = ""  # Empty string to analyze root directory
 
-        # Fetch GitHub repository information
+        # First, extract component counts from plugin data (marketplace.json)
+        # This ensures we show counts even if GitHub fetch fails
+
+        commands = []
+        skills = []
+        agents = []
+        hooks = []
+        has_mcp = False
+
+        if 'commands' in plugin and isinstance(plugin['commands'], list):
+            commands = plugin['commands']
+        if 'skills' in plugin and isinstance(plugin['skills'], list):
+            skills = plugin['skills']
+        if 'agents' in plugin and isinstance(plugin['agents'], list):
+            agents = plugin['agents']
+        if 'hooks' in plugin and isinstance(plugin['hooks'], list):
+            hooks = plugin['hooks']
+        if 'mcpServers' in plugin and isinstance(plugin['mcpServers'], list) and len(plugin['mcpServers']) > 0:
+            has_mcp = True
+
+        # Fetch GitHub repository information for stars, updated_at, and fallback counts
+        repo_data = None
         github_info = parse_github_url(github_url)
         if github_info:
             owner, repo, branch = github_info
             repo_data = fetch_github_repo_info(owner, repo, branch, plugin_path)
 
             if repo_data:
-                # Build stats line
-                stats_parts = []
+                # Use GitHub tree analysis as fallback if components not in marketplace.json
+                if not commands:
+                    commands = repo_data.get('commands', [])
+                if not skills:
+                    skills = repo_data.get('skills', [])
+                if not agents:
+                    agents = repo_data.get('agents', [])
+                if not hooks:
+                    hooks = repo_data.get('hooks', [])
+                if not has_mcp:
+                    has_mcp = repo_data.get('has_mcp', False)
 
-                # Stars
-                stats_parts.append(f"⭐ Stars: {repo_data['stars']}")
+        # Build stats line (show even if GitHub fetch failed)
+        stats_parts = []
 
-                # MCP support
-                mcp_status = "Yes" if repo_data.get('has_mcp') else "No"
-                stats_parts.append(f"🔌 MCP: {mcp_status}")
+        # Stars (only if we have repo_data)
+        if repo_data:
+            stats_parts.append(f"⭐ Stars: {repo_data['stars']}")
 
-                # Commands count
-                commands = repo_data.get('commands', [])
-                stats_parts.append(f"📜 Commands: {len(commands)}")
+        # MCP support
+        mcp_status = "Yes" if has_mcp else "No"
+        stats_parts.append(f"🔌 MCP: {mcp_status}")
 
-                # Skills count
-                skills = repo_data.get('skills', [])
-                stats_parts.append(f"🎯 Skills: {len(skills)}")
+        # Commands count
+        stats_parts.append(f"📜 Commands: {len(commands)}")
 
-                # Last updated
-                if repo_data['updated_at']:
-                    from datetime import datetime
-                    try:
-                        updated = datetime.fromisoformat(repo_data['updated_at'].replace('Z', '+00:00'))
-                        stats_parts.append(f"🕐 Last Updated: {updated.strftime('%Y-%m-%d')}")
-                    except:
-                        pass
+        # Skills/Agents/Hooks counts
+        if skills:
+            stats_parts.append(f"🎯 Skills: {len(skills)}")
+        if agents:
+            stats_parts.append(f"🤖 Agents: {len(agents)}")
+        if hooks:
+            stats_parts.append(f"🪝 Hooks: {len(hooks)}")
 
-                # Output stats line
-                output += f"\n{' | '.join(stats_parts)}\n"
+        # Last updated (only if we have repo_data)
+        if repo_data and repo_data.get('updated_at'):
+            from datetime import datetime
+            try:
+                updated = datetime.fromisoformat(repo_data['updated_at'].replace('Z', '+00:00'))
+                stats_parts.append(f"🕐 Last Updated: {updated.strftime('%Y-%m-%d')}")
+            except:
+                pass
 
-                # Show detailed lists if there are commands or skills
+        # Output stats line
+        output += f"\n{' | '.join(stats_parts)}\n"
+
+        # Show detailed lists if there are any components
+        if commands or skills or agents or hooks:
+            output += f"\n"
+
+            if commands:
+                output += f"Commands:\n"
+                for cmd in commands[:5]:  # Show first 5
+                    output += f"  - {cmd}\n"
+                if len(commands) > 5:
+                    output += f"  ... and {len(commands) - 5} more\n"
+
+            if skills:
+                if commands:
+                    output += f"\n"
+                output += f"Skills:\n"
+                for skill in skills[:5]:  # Show first 5
+                    output += f"  - {skill}\n"
+                if len(skills) > 5:
+                    output += f"  ... and {len(skills) - 5} more\n"
+
+            if agents:
                 if commands or skills:
                     output += f"\n"
+                output += f"Agents:\n"
+                for agent in agents[:5]:  # Show first 5
+                    output += f"  - {agent}\n"
+                if len(agents) > 5:
+                    output += f"  ... and {len(agents) - 5} more\n"
 
-                    if commands:
-                        output += f"Commands:\n"
-                        for cmd in commands[:5]:  # Show first 5
-                            output += f"  - {cmd}\n"
-                        if len(commands) > 5:
-                            output += f"  ... and {len(commands) - 5} more\n"
-
-                    if skills:
-                        if commands:
-                            output += f"\n"
-                        output += f"Skills:\n"
-                        for skill in skills[:5]:  # Show first 5
-                            output += f"  - {skill}\n"
-                        if len(skills) > 5:
-                            output += f"  ... and {len(skills) - 5} more\n"
+            if hooks:
+                if commands or skills or agents:
+                    output += f"\n"
+                output += f"Hooks:\n"
+                for hook in hooks[:5]:  # Show first 5
+                    output += f"  - {hook}\n"
+                if len(hooks) > 5:
+                    output += f"  ... and {len(hooks) - 5} more\n"
 
         # Add installation instructions in detailed mode
         marketplace_name = plugin.get('_marketplace', 'claude-plugins-official')
