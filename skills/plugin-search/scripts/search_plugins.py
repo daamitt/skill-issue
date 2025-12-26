@@ -543,15 +543,6 @@ def list_categories(plugins: List[Dict[str, Any]]) -> List[str]:
     return sorted(categories)
 
 
-def list_tags(plugins: List[Dict[str, Any]]) -> List[str]:
-    """Get unique list of tags."""
-    tags = set()
-    for plugin in plugins:
-        plugin_tags = plugin.get('tags', [])
-        tags.update(plugin_tags)
-    return sorted(tags)
-
-
 def main():
     parser = argparse.ArgumentParser(
         description='Search Claude Code plugins marketplace',
