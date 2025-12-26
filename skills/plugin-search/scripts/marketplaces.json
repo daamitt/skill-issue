@@ -13,10 +13,6 @@
       "base_url": "https://github.com/davila7/claude-code-templates"
     },
     {
-      "name": "awesome-claude-skills",
-      "base_url": "https://github.com/ComposioHQ/awesome-claude-skills/"
-    },
-    {
       "name": "wshobson-agents",
       "base_url": "https://github.com/wshobson/agents/"
     },
