@@ -7,7 +7,7 @@ A Claude Code skill for discovering and recommending plugins and skills from mul
 SkillIssue helps users find the right Claude Code plugins and skills for their needs by searching across multiple marketplaces, analyzing plugin capabilities, and providing ready-to-use installation commands.
 
 **Currently indexes 52 plugins and 100s of skills across 3 marketplaces!**
-Add your marketplace with a [Pull Request](#Adding More Marketplaces)
+Add your marketplace with a [Pull Request](#adding-more-marketplaces)
 
 ## Features
 
