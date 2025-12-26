@@ -11,7 +11,22 @@
     "plugins": [
         {
             "name": "SkillIssue",
-            "source": "./"
+            "description": "Skill to search for Claude Plugins and Skills",
+            "source": "./",
+            "version": "0.2.1",
+            "author": {
+                "name": "AmitB",
+                "email": "amit@1xn.ai",
+                "url": "https://github.com/daamitt"
+            },
+            "license": "MIT",
+            "homepage": "https://1xn.ai",
+            "keywords": [
+                "plugin",
+                "skill",
+                "plugin",
+                "search"
+            ]
         }
     ]
 }
