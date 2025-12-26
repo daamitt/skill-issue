@@ -18,7 +18,6 @@ CACHE_DURATION = 60 * 60  # 60 minutes in seconds
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(SCRIPT_DIR, "data")
 MARKETPLACES_CONFIG = os.path.join(SCRIPT_DIR, "marketplaces.json")
-MARKETPLACE_PATH_SUFFIX = "/main/.claude-plugin/marketplace.json"
 
 
 def load_marketplaces_config() -> List[Dict[str, str]]:
@@ -53,28 +52,41 @@ def needs_update(file_path: str, max_age_seconds: int = CACHE_DURATION) -> bool:
     return file_age > max_age_seconds
 
 
-def download_marketplace(url: str, file_path: str) -> bool:
+def download_marketplace(github_url: str, file_path: str) -> bool:
     """
-    Download the marketplace JSON file from the given URL using curl.
+    Download the marketplace JSON file from GitHub API.
+    Expects a GitHub repository URL (e.g., https://github.com/owner/repo).
 
     Args:
-        url: URL to download from
+        github_url: GitHub repository URL
         file_path: Local path to save the file
 
     Returns:
         True if successful, False otherwise
     """
     try:
+        # Extract owner/repo from GitHub URL
+        match = re.search(r'github\.com/([^/]+)/([^/]+?)(?:\.git)?(?:/|$)', github_url)
+        if not match:
+            print(f"Error: Invalid GitHub URL: {github_url}", file=sys.stderr)
+            return False
+
+        owner = match.group(1)
+        repo = match.group(2)
+
+        # Construct GitHub API URL for the marketplace.json file
+        api_url = f"https://api.github.com/repos/{owner}/{repo}/contents/.claude-plugin/marketplace.json"
+
         # Ensure directory exists
         dir_path = os.path.dirname(file_path)
-        if dir_path:  # Only create if there's a directory component
+        if dir_path:
             os.makedirs(dir_path, exist_ok=True)
 
-        print(f"Downloading marketplace data from {url}...", file=sys.stderr)
+        print(f"Downloading {owner}/{repo} marketplace data...", file=sys.stderr)
 
-        # Use curl to download (works better on macOS with SSL)
+        # Use GitHub API with proper headers
         result = subprocess.run(
-            ['curl', '-sL', url, '-o', file_path],
+            ['curl', '-sL', '-H', 'Accept: application/vnd.github.v3+json', api_url],
             capture_output=True,
             text=True,
             timeout=30
@@ -86,18 +98,35 @@ def download_marketplace(url: str, file_path: str) -> bool:
                 print(f"curl error: {result.stderr}", file=sys.stderr)
             return False
 
-        # Validate JSON
-        with open(file_path, 'r') as f:
-            json.load(f)
+        # GitHub API returns the file content in base64
+        try:
+            import base64
+            api_response = json.loads(result.stdout)
 
-        print(f"Successfully downloaded to {file_path}", file=sys.stderr)
-        return True
+            if 'content' not in api_response:
+                print(f"Error: GitHub API response missing 'content' field", file=sys.stderr)
+                print(f"Response: {result.stdout[:200]}", file=sys.stderr)
+                return False
+
+            # Decode base64 content
+            content = base64.b64decode(api_response['content']).decode('utf-8')
+
+            # Validate JSON
+            json.loads(content)
+
+            # Write to file
+            with open(file_path, 'w') as f:
+                f.write(content)
+
+            print(f"Successfully downloaded to {file_path}", file=sys.stderr)
+            return True
+
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"Error: Invalid GitHub API response: {e}", file=sys.stderr)
+            return False
 
     except subprocess.TimeoutExpired:
         print("Error: Download timeout", file=sys.stderr)
-        return False
-    except json.JSONDecodeError as e:
-        print(f"Error: Downloaded data is not valid JSON: {e}", file=sys.stderr)
         return False
     except FileNotFoundError:
         print("Error: curl command not found", file=sys.stderr)
@@ -118,12 +147,11 @@ def ensure_all_marketplaces() -> Dict[str, Any]:
     for marketplace in marketplaces:
         name = marketplace['name']
         base_url = marketplace['base_url']
-        url = f"{base_url}{MARKETPLACE_PATH_SUFFIX}"
         file_path = os.path.join(DATA_DIR, f"{name}.json")
 
         # Download or use cached data
         if needs_update(file_path):
-            if not download_marketplace(url, file_path):
+            if not download_marketplace(base_url, file_path):
                 if not os.path.exists(file_path):
                     print(f"Warning: Skipping {name} marketplace (download failed)", file=sys.stderr)
                     continue
@@ -453,10 +481,27 @@ def format_plugin_output(plugin: Dict[str, Any], detailed: bool = False) -> str:
 
         # Add installation instructions in detailed mode
         marketplace_name = plugin.get('_marketplace', 'claude-plugins-official')
+
+        # Get the marketplace repo path (owner/repo) from config
+        marketplaces = load_marketplaces_config()
+        marketplace_info = next((m for m in marketplaces if m['name'] == marketplace_name), None)
+        marketplace_repo = None
+
+        if marketplace_info:
+            # Extract owner/repo from base_url
+            base_url = marketplace_info['base_url']
+            match = re.search(r'github\.com/([^/]+/[^/]+?)(?:\.git)?(?:/|$)', base_url)
+            if match:
+                marketplace_repo = match.group(1)
+
+        # Fallback to marketplace name if we can't extract owner/repo
+        if not marketplace_repo:
+            marketplace_repo = f"anthropics/{marketplace_name}"
+
         output += f"\n{'─'*80}\n"
         output += f"📥 Installation:\n"
         output += f"  # First, add the marketplace (if not already added):\n"
-        output += f"  /plugin marketplace add anthropics/{marketplace_name}\n\n"
+        output += f"  /plugin marketplace add {marketplace_repo}\n\n"
         output += f"  # Then install the plugin:\n"
         output += f"  /plugin install {name}@{marketplace_name}\n"
 

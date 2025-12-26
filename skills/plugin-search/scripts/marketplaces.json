@@ -2,11 +2,15 @@
   "marketplaces": [
     {
       "name": "claude-plugins-official",
-      "base_url": "https://raw.githubusercontent.com/anthropics/claude-plugins-official"
+      "base_url": "https://github.com/anthropics/claude-plugins-official"
     },
     {
       "name": "anthropics-skills",
-      "base_url": "https://raw.githubusercontent.com/anthropics/skills"
+      "base_url": "https://github.com/anthropics/skills"
+    },
+    {
+      "name": "claude-code-templates",
+      "base_url": "https://github.com/davila7/claude-code-templates"
     }
   ]
 }

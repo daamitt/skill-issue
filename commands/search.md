@@ -1,6 +1,6 @@
 ---
 description: Search for a Skill or a Plugin
-argument-hint: Your search query
+argument-hint: Your search query (eg: notion or meetings)
 ---
 
 First broaden the users search query "$ARGUMENTS" into more terms and descroption based on users context.
